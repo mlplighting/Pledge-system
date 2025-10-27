@@ -1,30 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pledge Form</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 40px; }
-        form { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        label { display: block; margin: 10px 0 5px; }
-        input, button { width: 100%; padding: 10px; margin: 5px 0; }
-    </style>
+  <meta charset="utf-8" />
+  <title>Pledge Form</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; background:#f9f9f9; padding:40px; }
+    form { max-width:520px; margin:auto; background:#fff; padding:28px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,.1); }
+    h2 { text-align:center; margin-top:0; }
+    label { display:block; margin:12px 0 6px; font-weight:600; }
+    .row { display:flex; gap:10px; }
+    .row .col { flex:1; }
+    input, button { width:100%; padding:12px; font-size:16px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
+    button { margin-top:16px; cursor:pointer; }
+    .hint { font-size:12px; color:#777; margin-top:4px; }
+  </style>
 </head>
 <body>
-    <h2>Pledge Form</h2>
-    <form method="POST" action="https://script.google.com/macros/s/AKfycbxLodrpbwKU4SZPVZVrJWwDKHYZ4PyaPzFxdeU94ca3qfP8m4QS8nx4pQobPnKfFXxu0A/exec">
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name" required>
-        
-        <label for="phone">Phone:</label>
-        <input type="tel" id="phone" name="phone" required>
-        
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required>
-        
-        <label for="amount">Pledge Amount:</label>
-        <input type="number" id="amount" name="amount" required>
-        
-        <button type="submit">Submit</button>
-    </form>
+  <h2>Pledge Form</h2>
+
+  <!-- IMPORTANT: keep your Apps Script Web App URL in the action below -->
+  <form id="pledgeForm" method="POST" action="https://script.google.com/macros/s/AKfycbxLodrpbwKU4SZPVZVrJWwDKHYZ4PyaPzFxdeU94ca3qfP8m4QS8nx4pQobPnKfFXxu0A/exec">
+    <div class="row">
+      <div class="col">
+        <label for="first_name">First name</label>
+        <input type="text" id="first_name" name="first_name" required autocomplete="given-name" />
+      </div>
+      <div class="col">
+        <label for="last_name">Last name</label>
+        <input type="text" id="last_name" name="last_name" required autocomplete="family-name" />
+      </div>
+    </div>
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone" inputmode="numeric" maxlength="12" placeholder="123-456-7890" required />
+    <div class="hint">Format: 123-456-7890</div>
+
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" required autocomplete="email" />
+
+    <label for="amount_display">Pledge Amount</label>
+    <input type="text" id="amount_display" placeholder="$10,000" required />
+    <!-- hidden numeric field actually submitted to the backend -->
+    <input type="hidden" id="amount" name="amount" />
+
+    <button type="submit">Submit</button>
+  </form>
+
+  <script>
+    // Phone formatter: 123-456-7890
+    const phone = document.getElementById('phone');
+    phone.addEventListener('input', () => {
+      const digits = phone.value.replace(/\D/g, '').slice(0, 10);
+      let out = digits;
+      if (digits.length > 6) out = digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+      else if (digits.length > 3) out = digits.slice(0,3) + '-' + digits.slice(3);
+      phone.value = out;
+    });
+
+    // Currency formatter (display) + numeric (hidden)
+    const amountDisplay = document.getElementById('amount_display');
+    const amountHidden  = document.getElementById('amount');
+
+    function formatCurrencyDisplay(digits) {
+      if (!digits) return '';
+      // add commas
+      const withCommas = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return '$' + withCommas;
+    }
+
+    amountDisplay.addEventListener('input', () => {
+      const digits = amountDisplay.value.replace(/\D/g, '');
+      amountDisplay.value = formatCurrencyDisplay(digits);
+      amountHidden.value = digits ? String(parseInt(digits, 10)) : '';
+    });
+
+    // Ensure hidden numeric is set before submit
+    document.getElementById('pledgeForm').addEventListener('submit', (e) => {
+      // populate numeric if user didn't type after pasting
+      const digits = amountDisplay.value.replace(/\D/g, '');
+      amountHidden.value = digits ? String(parseInt(digits, 10)) : '';
+      if (!amountHidden.value) {
+        e.preventDefault();
+        alert('Please enter a valid amount.');
+      }
+    });
+  </script>
 </body>
 </html>
