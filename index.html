@@ -1,269 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Pledges Live Overlay</title>
-  <style>
-    :root{
-      /* Green screen for Resolume keying */
-      --chroma: #00b140;
-      /* UI colors */
-      --darkBlue: #0b1a3a;
-      --gold: #d8b34b;        /* borders */
-      --gold-strong: #f3d272; /* text */
-    }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pledges Live Overlay</title>
+<style>
+  :root{
+    --chroma:#00b140;  /* green screen for keying */
+    --darkBlue:#0b1a3a;
+    --gold:#d8b34b;        /* borders */
+    --gold-strong:#f3d272; /* text */
+  }
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--chroma);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{position:relative;width:100%;height:100%}
 
-    html, body {
-      height: 100%; margin: 0; overflow: hidden;
-      background: var(--chroma);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .wrap { position: relative; width: 100%; height: 100%; }
+  /* tiny debug (remove if you want) */
+  .debug{position:absolute;top:.6vh;left:.8vw;font-size:12px;opacity:.65;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4);pointer-events:none}
 
-    /* tiny debug (remove if you don’t want it) */
-    .debug {
-      position: absolute; top: .6vh; left: .8vw; font-size: 12px; opacity: .65; color: #fff;
-      text-shadow: 0 1px 2px rgba(0,0,0,.4); pointer-events: none;
-    }
+  /* Total (border only around number) */
+  .totalBar{position:absolute;top:2vh;left:50%;transform:translateX(-50%);width:min(92vw,1400px);text-align:center}
+  .totalLabel{color:var(--gold);letter-spacing:.06em;font-size:clamp(20px,3.2vh,34px);margin-bottom:.8vh;text-transform:uppercase;font-weight:900}
+  .totalValue{display:inline-block;padding:1vh 2vw;background:var(--darkBlue);color:var(--gold-strong);font-weight:900;font-size:clamp(34px,5.8vh,84px);border:3px solid var(--gold);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 0 20px rgba(255,255,255,.05)}
 
-    /* ===== Total (border only around the number) ===== */
-    .totalBar {
-      position: absolute; top: 2vh; left: 50%; transform: translateX(-50%);
-      width: min(92vw, 1400px); text-align: center;
-    }
-    .totalLabel {
-      color: var(--gold);
-      letter-spacing: .06em;
-      font-size: clamp(20px, 3.2vh, 34px);
-      margin-bottom: .8vh;
-      text-transform: uppercase;
-      font-weight: 900; /* bold */
-    }
-    .totalValue {
-      display: inline-block;
-      padding: 1vh 2vw;
-      background: var(--darkBlue);
-      color: var(--gold-strong);
-      font-weight: 900;
-      font-size: clamp(34px, 5.8vh, 84px);
-      border: 3px solid var(--gold);
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 0 20px rgba(255,255,255,.05);
-    }
+  /* Center on-air (tight inner card only) */
+  .onAir{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:transparent;border:none}
+  .onAirInner{display:inline-block;text-align:center;color:var(--gold-strong);background:var(--darkBlue);border:3px solid var(--gold);border-radius:16px;padding:1.8vh 2.4vw;box-shadow:0 16px 40px rgba(0,0,0,.45), inset 0 0 18px rgba(255,255,255,.05);display:none}
+  .pledgeName{font-size:clamp(20px,3.6vh,44px);font-weight:800}
+  .pledgeAmount{font-size:clamp(18px,3.2vh,38px);font-weight:700;margin-top:.5vh}
 
-    /* ===== Center on-air card (15s) ===== */
-    .onAir {
-      position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
-      min-width: min(62vw, 980px); max-width: min(80vw, 1200px);
-      text-align: center; color: var(--gold-strong);
-      background: var(--darkBlue);
-      border: 3px solid var(--gold);
-      border-radius: 16px;
-      padding: 2.6vh 3vw;
-      box-shadow: 0 16px 40px rgba(0,0,0,.45), inset 0 0 18px rgba(255,255,255,.05);
-      display: none;
-    }
-    .pledgeName { font-size: clamp(20px, 3.6vh, 44px); font-weight: 800; }
-    .pledgeAmount { font-size: clamp(18px, 3.2vh, 38px); font-weight: 700; margin-top: .5vh; }
+  /* Recent columns (no wide row border) */
+  .col{position:absolute;width:min(32vw,520px);bottom:4vh;display:flex;flex-direction:column;gap:.8vh}
+  .col.left{left:3vw;align-items:flex-start}
+  .col.right{right:3vw;align-items:flex-end}
+  .chip{max-width:100%;background:var(--darkBlue);border:2px solid var(--gold);border-radius:10px;color:var(--gold-strong);font-weight:700;padding:.6vh .9vw;box-shadow:0 6px 16px rgba(0,0,0,.35), inset 0 0 12px rgba(255,255,255,.05);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-    /* ===== Recent columns (no wide row border) ===== */
-    .col {
-      position: absolute; width: min(32vw, 520px);
-      bottom: 4vh; display: flex; flex-direction: column; gap: .8vh;
-    }
-    .col.left { left: 3vw; align-items: flex-start; }
-    .col.right { right: 3vw; align-items: flex-end; }
-
-    .chip {
-      max-width: 100%;
-      background: var(--darkBlue);
-      border: 2px solid var(--gold);
-      border-radius: 10px;
-      color: var(--gold-strong);
-      font-weight: 700;
-      padding: .6vh .9vw;
-      box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 0 12px rgba(255,255,255,.05);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-
-    /* fades */
-    .fade-in { animation: fadeIn .35s ease-out both; }
-    .fade-out { animation: fadeOut .25s ease-in both; }
-    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%,-53%); } to { opacity: 1; transform: translate(-50%,-50%); } }
-    @keyframes fadeOut { from { opacity: 1; transform: translate(-50%,-50%); } to { opacity: 0; transform: translate(-50%,-47%); } }
-  </style>
+  /* fades */
+  .fade-in{animation:fadeIn .35s ease-out both}
+  .fade-out{animation:fadeOut .25s ease-in both}
+  @keyframes fadeIn{from{opacity:0;transform:translate(-50%,-53%)}to{opacity:1;transform:translate(-50%,-50%)}}
+  @keyframes fadeOut{from{opacity:1;transform:translate(-50%,-50%)}to{opacity:0;transform:translate(-50%,-47%)}}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="debug" id="dbg">loading…</div>
+<div class="wrap">
+  <div class="debug" id="dbg">loading…</div>
 
-    <!-- Total -->
-    <div class="totalBar">
-      <div class="totalLabel">Total Pledged</div>
-      <div class="totalValue" id="totalAmount">$0</div>
-    </div>
+  <!-- Total -->
+  <div class="totalBar">
+    <div class="totalLabel">Total Pledged</div>
+    <div class="totalValue" id="totalAmount">$0</div>
+  </div>
 
-    <!-- Center name for 15s -->
-    <div class="onAir" id="onAirCard">
+  <!-- Center name (tight inner card) -->
+  <div class="onAir">
+    <div class="onAirInner" id="onAirInner">
       <div class="pledgeName" id="pledgeName"></div>
       <div class="pledgeAmount" id="pledgeAmount"></div>
     </div>
-
-    <!-- Recent columns (5 per side) -->
-    <div class="col left" id="colLeft"></div>
-    <div class="col right" id="colRight"></div>
   </div>
 
-  <script>
-    /* ===== CONFIG ===== */
-    const ENDPOINT_BASE = 'https://script.google.com/macros/s/AKfycbyap4VxcOBZ-0PwQuwgEaG3OeFNEly2EwFROUxU_2x8hU00xIqR7l-zMk_8j0zrDvDc9g/exec';
-    const POLL_MS = 5000;      // poll every 5s
-    const ONAIR_MS = 15000;    // each pledge displays ~15s
-    const LEFT_MAX = 5;        // left column size
-    const RIGHT_MAX = 5;       // right column size
+  <!-- Recent columns -->
+  <div class="col left" id="colLeft"></div>
+  <div class="col right" id="colRight"></div>
+</div>
 
-    /* ===== STATE ===== */
-    let seen = new Set();      // ids we've processed
-    let queue = [];            // new pledges awaiting on-air
-    let showing = false;
-    let currentTotal = 0;
-    let initialized = false;
-    let recentList = [];       // newest-first; cap at 10 (5 left + 5 right)
+<script>
+  /* ===== CONFIG ===== */
+  const ENDPOINT_BASE = 'https://script.google.com/macros/s/AKfycbyap4VxcOBZ-0PwQuwgEaG3OeFNEly2EwFROUxU_2x8hU00xIqR7l-zMk_8j0zrDvDc9g/exec';
+  const POLL_MS = 5000;
+  const ONAIR_MS = 15000;
+  const LEFT_MAX = 5;
+  const RIGHT_MAX = 5;
 
-    /* ===== DOM ===== */
-    const dbg = document.getElementById('dbg');
-    const totalEl = document.getElementById('totalAmount');
-    const onAir = document.getElementById('onAirCard');
-    const nameEl = document.getElementById('pledgeName');
-    const amtEl = document.getElementById('pledgeAmount');
-    const colLeft = document.getElementById('colLeft');
-    const colRight = document.getElementById('colRight');
+  /* ===== STATE ===== */
+  let seen = new Set();       // track processed IDs to prevent re-pledging
+  let queue = [];
+  let showing = false;
+  let currentTotal = 0;
+  let initialized = false;
+  let recentList = [];        // newest first (max 10)
 
-    const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  /* ===== DOM ===== */
+  const dbg = document.getElementById('dbg');
+  const totalEl = document.getElementById('totalAmount');
+  const onAirInner = document.getElementById('onAirInner');
+  const nameEl = document.getElementById('pledgeName');
+  const amtEl = document.getElementById('pledgeAmount');
+  const colLeft = document.getElementById('colLeft');
+  const colRight = document.getElementById('colRight');
 
-    function setDebug(text){
-      const now = new Date();
-      dbg.textContent = `${now.toLocaleTimeString()} • ${text}`;
-    }
+  const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
-    function renderTotal(val){ totalEl.textContent = usd0.format(Math.round(val)); }
-    function animateTotal(from, to, ms=800){
-      if(from===to) return;
-      const t0 = performance.now();
-      const tick = (t)=>{
-        const p = Math.min(1,(t - t0)/ms);
-        const v = from + (to-from)*p;
-        renderTotal(v);
-        if(p<1) requestAnimationFrame(tick); else renderTotal(to);
-      };
-      requestAnimationFrame(tick);
-    }
+  function setDebug(text){ dbg.textContent = `${new Date().toLocaleTimeString()} • ${text}`; }
+  function renderTotal(v){ totalEl.textContent = usd0.format(Math.round(v)); }
+  function animateTotal(from,to,ms=800){
+    if(from===to) return;
+    const t0 = performance.now();
+    const tick = t => {
+      const p = Math.min(1,(t-t0)/ms);
+      renderTotal(from + (to-from)*p);
+      if(p<1) requestAnimationFrame(tick); else renderTotal(to);
+    };
+    requestAnimationFrame(tick);
+  }
 
-    /* ===== Recent (2 columns, newest first) ===== */
-    function makeChip({name, amount}){
-      const el = document.createElement('div');
-      el.className = 'chip';
-      el.textContent = `${name} ${usd0.format(amount)}`; // no dash
-      return el;
-    }
+  /* ===== Recent (2 columns) ===== */
+  function makeChip({name, amount}){
+    const el = document.createElement('div');
+    el.className = 'chip';
+    el.textContent = `${name} ${usd0.format(amount)}`; // no dash
+    return el;
+  }
+  function renderRecent(){
+    colLeft.innerHTML = ''; colRight.innerHTML = '';
+    const L=[], R=[];
+    recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=> (idx % 2 === 0 ? L : R).push(p));
+    L.slice(0, LEFT_MAX).forEach(p=>colLeft.appendChild(makeChip(p)));
+    R.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
+  }
+  function addRecentTop(p){
+    recentList.unshift(p);
+    if (recentList.length > (LEFT_MAX + RIGHT_MAX)) recentList.length = (LEFT_MAX + RIGHT_MAX);
+    renderRecent();
+  }
 
-    function renderRecent(){
-      colLeft.innerHTML = '';
-      colRight.innerHTML = '';
-      const leftItems = [], rightItems = [];
-      recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=>{
-        (idx % 2 === 0 ? leftItems : rightItems).push(p);
-      });
-      leftItems.slice(0, LEFT_MAX).forEach(p=>colLeft.appendChild(makeChip(p)));
-      rightItems.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
-    }
+  /* ===== Build name safely (guard if feed ever sends first/last fields) ===== */
+  function buildName(r){
+    const first = r.firstName ?? r.firstname ?? r.first ?? r.FirstName ?? r["First Name"];
+    const last  = r.lastName  ?? r.lastname  ?? r.last  ?? r.LastName  ?? r["Last Name"];
+    const direct = r.name ?? r.Name;
+    const n = direct || [first,last].filter(Boolean).join(" ");
+    return String(n || "Anonymous").trim() || "Anonymous";
+  }
 
-    function addRecentTop(p){
-      recentList.unshift(p);
-      if (recentList.length > (LEFT_MAX + RIGHT_MAX)) {
-        recentList.length = (LEFT_MAX + RIGHT_MAX); // cap at 10
+  /* ===== Normalize feed ===== */
+  function normalize(data){
+    const rows = Array.isArray(data?.pledges) ? data.pledges
+               : Array.isArray(data?.data) ? data.data
+               : Array.isArray(data) ? data : [];
+    return rows.map((r, i) => {
+      // Use provided row-based IDs from the script; fallback to index
+      const id = String(r.id ?? r.row ?? (i+1));
+      const name = buildName(r);
+      const amount = Number(String(r.amount ?? r.Amount ?? 0).replace(/[^\d.]/g,'')) || 0;
+      const ts = Date.parse(r.timestamp ?? r.Timestamp ?? Date.now()) || Date.now();
+      return { id, name, amount, ts };
+    }).filter(p => p.amount > 0).sort((a,b)=>a.ts-b.ts);
+  }
+
+  /* ===== Polling ===== */
+  async function poll(){
+    try{
+      const res = await fetch(`${ENDPOINT_BASE}?t=${Date.now()}`, { cache:'no-store' });
+      const data = await res.json();
+      const pledges = normalize(data);
+
+      setDebug(`feed: ${pledges.length} pledges`);
+
+      if(!initialized){
+        pledges.forEach(p=>seen.add(p.id));          // mark all existing as seen once
+        currentTotal = pledges.reduce((s,p)=>s+p.amount, 0);
+        renderTotal(currentTotal);
+        recentList = pledges.slice(- (LEFT_MAX + RIGHT_MAX)).reverse(); // newest first
+        renderRecent();
+        initialized = true;
+        return;
       }
-      renderRecent();
+
+      // Only queue truly new IDs → prevents re-pledging
+      const newOnes = pledges.filter(p=>!seen.has(p.id));
+      newOnes.forEach(p=>{ seen.add(p.id); queue.push(p); });
+      kickLoop();
+    }catch(e){
+      setDebug('feed error');
     }
+  }
 
-    /* ===== Normalize feed ===== */
-    function normalize(data) {
-      const rows = Array.isArray(data?.pledges) ? data.pledges
-                 : Array.isArray(data?.data) ? data.data
-                 : Array.isArray(data) ? data : [];
-      return rows.map((r, i) => {
-        const id = String(r.id ?? `${r.name}|${r.amount}|${r.timestamp}|${i}`);
-        const name = String(r.name ?? r.Name ?? 'Anonymous').trim() || 'Anonymous';
-        const amount = Number(String(r.amount ?? r.Amount ?? 0).replace(/[^\d.]/g,'')) || 0;
-        const ts = Date.parse(r.timestamp ?? r.Timestamp ?? Date.now()) || Date.now();
-        return { id, name, amount, ts };
-      }).filter(p => p.amount > 0).sort((a,b)=>a.ts-b.ts);
-    }
+  /* ===== On-air loop (15s per pledge) ===== */
+  function kickLoop(){
+    if(showing || queue.length===0) return;
+    const next = queue.shift();
+    showing = true;
 
-    /* ===== Polling ===== */
-    async function poll(){
-      try{
-        const url = `${ENDPOINT_BASE}?t=${Date.now()}`; // cache-bust
-        const res = await fetch(url, { cache: 'no-store' });
-        const data = await res.json();
-        const pledges = normalize(data);
+    nameEl.textContent = next.name;
+    amtEl.textContent  = usd0.format(next.amount);
 
-        setDebug(`feed: ${pledges.length} pledges`);
+    onAirInner.classList.remove('fade-out');
+    onAirInner.style.display = 'inline-block';
+    onAirInner.classList.add('fade-in');
 
-        if(!initialized){
-          // Baseline: total + seed recent (last 10)
-          pledges.forEach(p=>seen.add(p.id));
-          currentTotal = pledges.reduce((s,p)=>s+p.amount, 0);
-          renderTotal(currentTotal);
-          recentList = pledges.slice(- (LEFT_MAX + RIGHT_MAX)).reverse(); // newest first
-          renderRecent();
-          initialized = true;
-          return;
-        }
+    const target = currentTotal + next.amount;
+    animateTotal(currentTotal, target, 900);
+    currentTotal = target;
 
-        // Queue new ones
-        const newOnes = pledges.filter(p=>!seen.has(p.id));
-        newOnes.forEach(p=>{ seen.add(p.id); queue.push(p); });
-        kickLoop();
-      }catch(e){
-        setDebug('feed error');
-      }
-    }
-
-    /* ===== On-air loop (15s per pledge) ===== */
-    function kickLoop(){
-      if(showing || queue.length===0) return;
-      const next = queue.shift();
-      showing = true;
-
-      nameEl.textContent = next.name;
-      amtEl.textContent = usd0.format(next.amount);
-
-      onAir.classList.remove('fade-out');
-      onAir.style.display = 'block';
-      onAir.classList.add('fade-in');
-
-      const target = currentTotal + next.amount;
-      animateTotal(currentTotal, target, 900);
-      currentTotal = target;
-
+    setTimeout(()=>{
+      onAirInner.classList.remove('fade-in');
+      onAirInner.classList.add('fade-out');
       setTimeout(()=>{
-        onAir.classList.remove('fade-in');
-        onAir.classList.add('fade-out');
-        setTimeout(()=>{
-          onAir.style.display = 'none';
-          addRecentTop(next);
-          showing = false;
-          if(queue.length>0) kickLoop();
-        }, 260);
-      }, ONAIR_MS);
-    }
+        onAirInner.style.display = 'none';
+        addRecentTop(next);
+        showing = false;
+        if(queue.length>0) kickLoop();
+      }, 260);
+    }, ONAIR_MS);
+  }
 
-    /* ===== Start ===== */
-    renderTotal(0);
-    poll();
-    setInterval(poll, POLL_MS);
-  </script>
+  /* START */
+  renderTotal(0);
+  poll();
+  setInterval(poll, POLL_MS);
+</script>
 </body>
 </html>
