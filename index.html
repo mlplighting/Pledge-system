@@ -22,23 +22,40 @@
   .totalLabel{color:var(--gold);letter-spacing:.06em;font-size:clamp(20px,3.2vh,34px);margin-bottom:.8vh;text-transform:uppercase;font-weight:900}
   .totalValue{display:inline-block;padding:1vh 2vw;background:var(--darkBlue);color:var(--gold-strong);font-weight:900;font-size:clamp(34px,5.8vh,84px);border:3px solid var(--gold);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 0 20px rgba(255,255,255,.05)}
 
-  /* Center on-air (tight inner card only) */
-  .onAir{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:transparent;border:none}
-  .onAirInner{display:inline-block;text-align:center;color:var(--gold-strong);background:var(--darkBlue);border:3px solid var(--gold);border-radius:16px;padding:1.8vh 2.4vw;box-shadow:0 16px 40px rgba(0,0,0,.45), inset 0 0 18px rgba(255,255,255,.05);display:none}
-  .pledgeName{font-size:clamp(20px,3.6vh,44px);font-weight:800}
-  .pledgeAmount{font-size:clamp(18px,3.2vh,38px);font-weight:700;margin-top:.5vh}
+  /* Latest pledge card RIGHT UNDER the total (tight inner box only) */
+  .onAir{position:absolute;left:50%;top:11vh;transform:translateX(-50%);background:transparent;border:none}
+  .onAirInner{display:inline-block;text-align:center;color:var(--gold-strong);background:var(--darkBlue);border:3px solid var(--gold);border-radius:12px;padding:1vh 1.6vw;box-shadow:0 16px 40px rgba(0,0,0,.45), inset 0 0 12px rgba(255,255,255,.05);display:none}
+  .pledgeName{font-size:clamp(20px,3.4vh,42px);font-weight:800}
+  .pledgeAmount{font-size:clamp(18px,3.0vh,36px);font-weight:700;margin-top:.4vh}
 
-  /* Recent columns (no wide row border) */
-  .col{position:absolute;width:min(32vw,520px);bottom:4vh;display:flex;flex-direction:column;gap:.8vh}
-  .col.left{left:3vw;align-items:flex-start}
-  .col.right{right:3vw;align-items:flex-end}
-  .chip{max-width:100%;background:var(--darkBlue);border:2px solid var(--gold);border-radius:10px;color:var(--gold-strong);font-weight:700;padding:.6vh .9vw;box-shadow:0 6px 16px rgba(0,0,0,.35), inset 0 0 12px rgba(255,255,255,.05);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Recent columns (TOP → DOWN, larger font) */
+  .col{
+    position:absolute; top:20vh; /* start near the latest card, flow downward */
+    width:min(32vw,520px);
+    display:flex; flex-direction:column; gap:1.0vh;
+  }
+  .col.left{ left:3vw; align-items:flex-start }
+  .col.right{ right:3vw; align-items:flex-end }
+
+  .chip{
+    max-width:100%;
+    background:var(--darkBlue);
+    border:2px solid var(--gold);
+    border-radius:10px;
+    color:var(--gold-strong);
+    font-weight:700;
+    /* bigger text in columns */
+    font-size:clamp(16px, 2.6vh, 28px);
+    padding:.7vh 1.0vw;
+    box-shadow:0 6px 16px rgba(0,0,0,.35), inset 0 0 12px rgba(255,255,255,.05);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
 
   /* fades */
-  .fade-in{animation:fadeIn .35s ease-out both}
-  .fade-out{animation:fadeOut .25s ease-in both}
-  @keyframes fadeIn{from{opacity:0;transform:translate(-50%,-53%)}to{opacity:1;transform:translate(-50%,-50%)}}
-  @keyframes fadeOut{from{opacity:1;transform:translate(-50%,-50%)}to{opacity:0;transform:translate(-50%,-47%)}}
+  .fade-in{animation:fadeIn .32s ease-out both}
+  .fade-out{animation:fadeOut .22s ease-in both}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-6px)}}
 </style>
 </head>
 <body>
@@ -51,7 +68,7 @@
     <div class="totalValue" id="totalAmount">$0</div>
   </div>
 
-  <!-- Center name (tight inner card) -->
+  <!-- Latest pledge (tight inner box, sits under total) -->
   <div class="onAir">
     <div class="onAirInner" id="onAirInner">
       <div class="pledgeName" id="pledgeName"></div>
@@ -59,7 +76,7 @@
     </div>
   </div>
 
-  <!-- Recent columns -->
+  <!-- Recent columns (top-down) -->
   <div class="col left" id="colLeft"></div>
   <div class="col right" id="colRight"></div>
 </div>
@@ -68,14 +85,14 @@
   /* ===== CONFIG ===== */
   const ENDPOINT_BASE = 'https://script.google.com/macros/s/AKfycbyap4VxcOBZ-0PwQuwgEaG3OeFNEly2EwFROUxU_2x8hU00xIqR7l-zMk_8j0zrDvDc9g/exec';
   const POLL_MS = 5000;
-  const ONAIR_MS = 15000;
   const LEFT_MAX = 5;
   const RIGHT_MAX = 5;
 
   /* ===== STATE ===== */
-  let seen = new Set();       // track processed IDs to prevent re-pledging
-  let queue = [];
-  let showing = false;
+  let seen = new Set();       // processed IDs
+  let queue = [];             // newly arrived pledges
+  let switching = false;      // animating between on-air items
+  let currentOnAir = null;    // currently displayed pledge (stays until next)
   let currentTotal = 0;
   let initialized = false;
   let recentList = [];        // newest first (max 10)
@@ -104,19 +121,20 @@
     requestAnimationFrame(tick);
   }
 
-  /* ===== Recent (2 columns) ===== */
+  /* ===== Recent (2 columns top-down) ===== */
   function makeChip({name, amount}){
     const el = document.createElement('div');
     el.className = 'chip';
-    el.textContent = `${name} ${usd0.format(amount)}`; // no dash
+    el.textContent = `${name} ${usd0.format(amount)}`;
     return el;
   }
   function renderRecent(){
     colLeft.innerHTML = ''; colRight.innerHTML = '';
-    const L=[], R=[];
-    recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=> (idx % 2 === 0 ? L : R).push(p));
-    L.slice(0, LEFT_MAX).forEach(p=>colLeft.appendChild(makeChip(p)));
-    R.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
+    // Recent list is newest-first; render top-down
+    const leftItems = [], rightItems = [];
+    recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=> (idx % 2 === 0 ? leftItems : rightItems).push(p));
+    leftItems.slice(0, LEFT_MAX).forEach(p=>colLeft.appendChild(makeChip(p)));
+    rightItems.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
   }
   function addRecentTop(p){
     recentList.unshift(p);
@@ -124,7 +142,7 @@
     renderRecent();
   }
 
-  /* ===== Build name safely (guard if feed ever sends first/last fields) ===== */
+  /* ===== Safe name builder (in case feed ever splits first/last) ===== */
   function buildName(r){
     const first = r.firstName ?? r.firstname ?? r.first ?? r.FirstName ?? r["First Name"];
     const last  = r.lastName  ?? r.lastname  ?? r.last  ?? r.LastName  ?? r["Last Name"];
@@ -139,13 +157,52 @@
                : Array.isArray(data?.data) ? data.data
                : Array.isArray(data) ? data : [];
     return rows.map((r, i) => {
-      // Use provided row-based IDs from the script; fallback to index
       const id = String(r.id ?? r.row ?? (i+1));
       const name = buildName(r);
       const amount = Number(String(r.amount ?? r.Amount ?? 0).replace(/[^\d.]/g,'')) || 0;
       const ts = Date.parse(r.timestamp ?? r.Timestamp ?? Date.now()) || Date.now();
       return { id, name, amount, ts };
     }).filter(p => p.amount > 0).sort((a,b)=>a.ts-b.ts);
+  }
+
+  /* ===== On-air switching ===== */
+  function showOnAir(p, addToTotal){
+    // if switching from an existing on-air, fade it out, drop to recent, then fade in the new one
+    const doFadeIn = ()=>{
+      nameEl.textContent = p.name;
+      amtEl.textContent  = usd0.format(p.amount);
+      onAirInner.style.display = 'inline-block';
+      onAirInner.classList.remove('fade-out');
+      onAirInner.classList.add('fade-in');
+      if (addToTotal) {
+        const target = currentTotal + p.amount;
+        animateTotal(currentTotal, target, 900);
+        currentTotal = target;
+      }
+      currentOnAir = p;
+      switching = false;
+      // if more arrivals queued during switch, process next
+      if (queue.length > 0) switchNext();
+    };
+
+    if (currentOnAir){
+      onAirInner.classList.remove('fade-in');
+      onAirInner.classList.add('fade-out');
+      switching = true;
+      setTimeout(()=>{
+        onAirInner.style.display = 'none';
+        addRecentTop(currentOnAir);
+        doFadeIn();
+      }, 220); // match fade-out
+    } else {
+      doFadeIn();
+    }
+  }
+
+  function switchNext(){
+    if (switching || queue.length === 0) return;
+    const next = queue.shift();
+    showOnAir(next, /*addToTotal=*/true);
   }
 
   /* ===== Polling ===== */
@@ -158,51 +215,26 @@
       setDebug(`feed: ${pledges.length} pledges`);
 
       if(!initialized){
-        pledges.forEach(p=>seen.add(p.id));          // mark all existing as seen once
+        // mark all existing as seen, set baseline total, seed columns, and
+        // SHOW the latest pledge on-air (without adding to total again)
+        pledges.forEach(p=>seen.add(p.id));
         currentTotal = pledges.reduce((s,p)=>s+p.amount, 0);
         renderTotal(currentTotal);
-        recentList = pledges.slice(- (LEFT_MAX + RIGHT_MAX)).reverse(); // newest first
+        recentList = pledges.slice(0, Math.max(0, pledges.length - 1)).slice(- (LEFT_MAX + RIGHT_MAX)).reverse();
         renderRecent();
+        const latest = pledges[pledges.length - 1];
+        if (latest) showOnAir(latest, /*addToTotal=*/false);
         initialized = true;
         return;
       }
 
-      // Only queue truly new IDs → prevents re-pledging
+      // Only queue truly new IDs
       const newOnes = pledges.filter(p=>!seen.has(p.id));
       newOnes.forEach(p=>{ seen.add(p.id); queue.push(p); });
-      kickLoop();
+      switchNext();
     }catch(e){
       setDebug('feed error');
     }
-  }
-
-  /* ===== On-air loop (15s per pledge) ===== */
-  function kickLoop(){
-    if(showing || queue.length===0) return;
-    const next = queue.shift();
-    showing = true;
-
-    nameEl.textContent = next.name;
-    amtEl.textContent  = usd0.format(next.amount);
-
-    onAirInner.classList.remove('fade-out');
-    onAirInner.style.display = 'inline-block';
-    onAirInner.classList.add('fade-in');
-
-    const target = currentTotal + next.amount;
-    animateTotal(currentTotal, target, 900);
-    currentTotal = target;
-
-    setTimeout(()=>{
-      onAirInner.classList.remove('fade-in');
-      onAirInner.classList.add('fade-out');
-      setTimeout(()=>{
-        onAirInner.style.display = 'none';
-        addRecentTop(next);
-        showing = false;
-        if(queue.length>0) kickLoop();
-      }, 260);
-    }, ONAIR_MS);
   }
 
   /* START */
