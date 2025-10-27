@@ -6,15 +6,14 @@
   <title>Pledges Live Overlay</title>
   <style>
     :root{
-      /* Chroma green for keying; adjust if your keyer prefers a different hue */
+      /* Green screen background for Resolume keying */
       --chroma: #00b140;
+      /* UI colors */
       --darkBlue: #0b1a3a;
-      --gold: #d8b34b;
-      --gold-strong: #f3d272;
-      --glass: rgba(255,255,255,0.06);
+      --gold: #d8b34b;        /* borders */
+      --gold-strong: #f3d272; /* text */
     }
 
-    /* ==== Stage (green screen) ==== */
     html, body {
       height: 100%; margin: 0; overflow: hidden;
       background: var(--chroma);
@@ -22,29 +21,38 @@
     }
     .wrap { position: relative; width: 100%; height: 100%; }
 
-    /* ==== Total (border only around the number) ==== */
+    /* (tiny) debug line — remove if not needed */
+    .debug {
+      position: absolute; top: .6vh; left: .8vw; font-size: 12px; opacity: .65; color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,.4); pointer-events: none;
+    }
+
+    /* ===== Total (border only around the number) ===== */
     .totalBar {
       position: absolute; top: 2vh; left: 50%; transform: translateX(-50%);
       width: min(92vw, 1400px); text-align: center;
     }
     .totalLabel {
-      color: var(--gold); opacity: .95; letter-spacing: .06em;
-      font-size: clamp(14px, 2.2vh, 22px); margin-bottom: .6vh;
+      color: var(--gold);
+      letter-spacing: .06em;
+      font-size: clamp(20px, 3.2vh, 34px); /* bigger + bold */
+      margin-bottom: .8vh;
       text-transform: uppercase;
+      font-weight: 900;
     }
     .totalValue {
       display: inline-block;
-      padding: .8vh 1.6vw;
+      padding: 1vh 2vw;
       background: var(--darkBlue);
       color: var(--gold-strong);
       font-weight: 900;
-      font-size: clamp(28px, 5.4vh, 76px);
+      font-size: clamp(34px, 5.8vh, 84px);
       border: 3px solid var(--gold);
       border-radius: 12px;
       box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 0 20px rgba(255,255,255,.05);
     }
 
-    /* ==== On-air spotlight card (center) ==== */
+    /* ===== Center on-air card (15s) ===== */
     .onAir {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
       min-width: min(62vw, 980px); max-width: min(80vw, 1200px);
@@ -59,7 +67,7 @@
     .pledgeName { font-size: clamp(20px, 3.6vh, 44px); font-weight: 800; }
     .pledgeAmount { font-size: clamp(18px, 3.2vh, 38px); font-weight: 700; margin-top: .5vh; }
 
-    /* ==== Recent columns (left/right); NO wide row border ==== */
+    /* ===== Recent columns (no wide row border) ===== */
     .col {
       position: absolute; width: min(32vw, 520px);
       bottom: 4vh; display: flex; flex-direction: column; gap: .8vh;
@@ -79,7 +87,7 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* Simple fades for the on-air card */
+    /* fades */
     .fade-in { animation: fadeIn .35s ease-out both; }
     .fade-out { animation: fadeOut .25s ease-in both; }
     @keyframes fadeIn { from { opacity: 0; transform: translate(-50%,-53%); } to { opacity: 1; transform: translate(-50%,-50%); } }
@@ -88,6 +96,8 @@
 </head>
 <body>
   <div class="wrap">
+    <div class="debug" id="dbg">loading…</div>
+
     <!-- Total -->
     <div class="totalBar">
       <div class="totalLabel">Total Pledged</div>
@@ -107,9 +117,9 @@
 
   <script>
     /* ===== CONFIG ===== */
-    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyap4VxcOBZ-0PwQuwgEaG3OeFNEly2EwFROUxU_2x8hU00xIqR7l-zMk_8j0zrDvDc9g/exec';
+    const ENDPOINT_BASE = 'https://script.google.com/macros/s/AKfycbyap4VxcOBZ-0PwQuwgEaG3OeFNEly2EwFROUxU_2x8hU00xIqR7l-zMk_8j0zrDvDc9g/exec';
     const POLL_MS = 5000;      // poll every 5s
-    const ONAIR_MS = 15000;    // on-air duration per pledge
+    const ONAIR_MS = 15000;    // each pledge displays ~15s
     const LEFT_MAX = 5;        // left column size
     const RIGHT_MAX = 5;       // right column size
 
@@ -119,9 +129,10 @@
     let showing = false;
     let currentTotal = 0;
     let initialized = false;
-    let recentList = [];       // newest-first; max 10 (5 left + 5 right)
+    let recentList = [];       // newest-first; cap at 10 (5 left + 5 right)
 
     /* ===== DOM ===== */
+    const dbg = document.getElementById('dbg');
     const totalEl = document.getElementById('totalAmount');
     const onAir = document.getElementById('onAirCard');
     const nameEl = document.getElementById('pledgeName');
@@ -131,18 +142,9 @@
 
     const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
-    /* ===== HELPERS ===== */
-    function normalize(data) {
-      const rows = Array.isArray(data?.pledges) ? data.pledges
-                 : Array.isArray(data?.data) ? data.data
-                 : Array.isArray(data) ? data : [];
-      return rows.map((r, i) => {
-        const id = String(r.id ?? `${r.name}|${r.amount}|${r.timestamp}|${i}`);
-        const name = String(r.name ?? r.Name ?? 'Anonymous').trim() || 'Anonymous';
-        const amount = Number(String(r.amount ?? r.Amount ?? 0).replace(/[^\d.]/g,'')) || 0;
-        const ts = Date.parse(r.timestamp ?? r.Timestamp ?? Date.now()) || Date.now();
-        return { id, name, amount, ts };
-      }).filter(p => p.amount > 0).sort((a,b)=>a.ts-b.ts);
+    function setDebug(text){
+      const now = new Date();
+      dbg.textContent = `${now.toLocaleTimeString()} • ${text}`;
     }
 
     function renderTotal(val){ totalEl.textContent = usd0.format(Math.round(val)); }
@@ -158,14 +160,18 @@
       requestAnimationFrame(tick);
     }
 
-    /* Layout recent into two columns, newest at top of each column.
-       We keep recentList length <= 10 (LEFT_MAX + RIGHT_MAX). */
+    /* ===== Recent (2 columns, no row border, newest first) ===== */
+    function makeChip({name, amount}){
+      const el = document.createElement('div');
+      el.className = 'chip';
+      el.textContent = `${name} ${usd0.format(amount)}`; // no dash
+      return el;
+    }
+
     function renderRecent(){
       colLeft.innerHTML = '';
       colRight.innerHTML = '';
-      // Split alternating into left/right for a balanced look
-      const leftItems = [];
-      const rightItems = [];
+      const leftItems = [], rightItems = [];
       recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=>{
         (idx % 2 === 0 ? leftItems : rightItems).push(p);
       });
@@ -173,33 +179,40 @@
       rightItems.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
     }
 
-    function makeChip({name, amount}){
-      const el = document.createElement('div');
-      el.className = 'chip';
-      // No dash between name and amount:
-      el.textContent = `${name} ${usd0.format(amount)}`;
-      return el;
-    }
-
     function addRecentTop(p){
-      // newest first
       recentList.unshift(p);
-      // cap at 10
       if (recentList.length > (LEFT_MAX + RIGHT_MAX)) {
-        recentList.length = (LEFT_MAX + RIGHT_MAX);
+        recentList.length = (LEFT_MAX + RIGHT_MAX); // cap at 10
       }
       renderRecent();
     }
 
-    /* ===== POLLING ===== */
+    /* ===== Normalize feed ===== */
+    function normalize(data) {
+      const rows = Array.isArray(data?.pledges) ? data.pledges
+                 : Array.isArray(data?.data) ? data.data
+                 : Array.isArray(data) ? data : [];
+      return rows.map((r, i) => {
+        const id = String(r.id ?? `${r.name}|${r.amount}|${r.timestamp}|${i}`);
+        const name = String(r.name ?? r.Name ?? 'Anonymous').trim() || 'Anonymous';
+        const amount = Number(String(r.amount ?? r.Amount ?? 0).replace(/[^\d.]/g,'')) || 0;
+        const ts = Date.parse(r.timestamp ?? r.Timestamp ?? Date.now()) || Date.now();
+        return { id, name, amount, ts };
+      }).filter(p => p.amount > 0).sort((a,b)=>a.ts-b.ts);
+    }
+
+    /* ===== Polling ===== */
     async function poll(){
       try{
-        const res = await fetch(ENDPOINT, { cache: 'no-store' });
+        const url = `${ENDPOINT_BASE}?t=${Date.now()}`; // cache-bust
+        const res = await fetch(url, { cache: 'no-store' });
         const data = await res.json();
         const pledges = normalize(data);
 
+        setDebug(`feed: ${pledges.length} pledges`);
+
         if(!initialized){
-          // baseline totals + seed recent (last 10)
+          // Baseline: total + seed recent (last 10)
           pledges.forEach(p=>seen.add(p.id));
           currentTotal = pledges.reduce((s,p)=>s+p.amount, 0);
           renderTotal(currentTotal);
@@ -209,16 +222,16 @@
           return;
         }
 
-        // enqueue only new ones
+        // Queue new ones
         const newOnes = pledges.filter(p=>!seen.has(p.id));
         newOnes.forEach(p=>{ seen.add(p.id); queue.push(p); });
         kickLoop();
       }catch(e){
-        // optional: console.error(e);
+        setDebug('feed error');
       }
     }
 
-    /* ===== ON-AIR LOOP ===== */
+    /* ===== On-air loop (15s per pledge) ===== */
     function kickLoop(){
       if(showing || queue.length===0) return;
       const next = queue.shift();
@@ -240,14 +253,14 @@
         onAir.classList.add('fade-out');
         setTimeout(()=>{
           onAir.style.display = 'none';
-          addRecentTop(next);   // move to columns
+          addRecentTop(next);
           showing = false;
           if(queue.length>0) kickLoop();
         }, 260);
       }, ONAIR_MS);
     }
 
-    /* ===== START ===== */
+    /* ===== Start ===== */
     renderTotal(0);
     poll();
     setInterval(poll, POLL_MS);
