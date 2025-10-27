@@ -5,261 +5,251 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pledges Live Overlay</title>
   <style>
-    /* ===== Layout (transparent overlay) ===== */
+    :root{
+      /* Chroma green for keying; adjust if your keyer prefers a different hue */
+      --chroma: #00b140;
+      --darkBlue: #0b1a3a;
+      --gold: #d8b34b;
+      --gold-strong: #f3d272;
+      --glass: rgba(255,255,255,0.06);
+    }
+
+    /* ==== Stage (green screen) ==== */
     html, body {
-      height: 100%;
-      margin: 0;
-      background: transparent; /* keep overlay see-through */
+      height: 100%; margin: 0; overflow: hidden;
+      background: var(--chroma);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color: #fff;
-      overflow: hidden;
     }
-    .wrap {
-      position: relative;
-      height: 100%;
-      width: 100%;
-      padding: 3vh 4vw;
-      box-sizing: border-box;
-    }
+    .wrap { position: relative; width: 100%; height: 100%; }
 
-    /* ===== Total bar ===== */
+    /* ==== Total (border only around the number) ==== */
     .totalBar {
-      position: absolute;
-      top: 2vh;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(92vw, 1400px);
-      text-align: center;
-      padding: 1.2vh 2vw;
-      border-radius: 12px;
-      background: rgba(0,0,0,0.45);
-      backdrop-filter: blur(6px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      position: absolute; top: 2vh; left: 50%; transform: translateX(-50%);
+      width: min(92vw, 1400px); text-align: center;
     }
-    .totalLabel { font-size: clamp(14px, 2.2vh, 22px); opacity: 0.85; letter-spacing: 0.06em; }
-    .totalValue { font-weight: 800; font-size: clamp(28px, 5.2vh, 72px); }
+    .totalLabel {
+      color: var(--gold); opacity: .95; letter-spacing: .06em;
+      font-size: clamp(14px, 2.2vh, 22px); margin-bottom: .6vh;
+      text-transform: uppercase;
+    }
+    .totalValue {
+      display: inline-block;
+      padding: .8vh 1.6vw;
+      background: var(--darkBlue);
+      color: var(--gold-strong);
+      font-weight: 900;
+      font-size: clamp(28px, 5.4vh, 76px);
+      border: 3px solid var(--gold);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 0 20px rgba(255,255,255,.05);
+    }
 
-    /* ===== On-air card (the 15s spotlight) ===== */
+    /* ==== On-air spotlight card (center) ==== */
     .onAir {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: min(80vw, 1200px);
-      padding: 3vh 3vw;
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      min-width: min(62vw, 980px); max-width: min(80vw, 1200px);
+      text-align: center; color: var(--gold-strong);
+      background: var(--darkBlue);
+      border: 3px solid var(--gold);
       border-radius: 16px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.3));
-      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
-      color: #fff;
-      text-align: center;
+      padding: 2.6vh 3vw;
+      box-shadow: 0 16px 40px rgba(0,0,0,.45), inset 0 0 18px rgba(255,255,255,.05);
       display: none;
     }
-    .pledgeName { font-size: clamp(18px, 3.4vh, 42px); font-weight: 700; }
-    .pledgeAmount { font-size: clamp(18px, 3.2vh, 38px); font-weight: 600; opacity: 0.95; margin-top: 0.6vh; }
+    .pledgeName { font-size: clamp(20px, 3.6vh, 44px); font-weight: 800; }
+    .pledgeAmount { font-size: clamp(18px, 3.2vh, 38px); font-weight: 700; margin-top: .5vh; }
 
-    /* ===== Recent pledges row ===== */
-    .recentPledges {
-      position: absolute;
-      bottom: 2vh;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(92vw, 1400px);
-      padding: 1.2vh 2vw;
-      background: rgba(0,0,0,0.5);
-      backdrop-filter: blur(4px);
+    /* ==== Recent columns (left/right); NO wide row border ==== */
+    .col {
+      position: absolute; width: min(32vw, 520px);
+      bottom: 4vh; display: flex; flex-direction: column; gap: .8vh;
+    }
+    .col.left { left: 3vw; align-items: flex-start; }
+    .col.right { right: 3vw; align-items: flex-end; }
+
+    .chip {
+      max-width: 100%;
+      background: var(--darkBlue);
+      border: 2px solid var(--gold);
       border-radius: 10px;
-      box-shadow: 0 6px 15px rgba(0,0,0,0.2);
-      color: #fff;
-      font-size: clamp(14px, 2.5vh, 22px);
-      display: flex;
-      gap: 1.2rem;
-      flex-wrap: nowrap;
-      overflow: hidden;
-      align-items: center;
-    }
-    .recentPledges .tag {
-      white-space: nowrap;
-      padding: 0.4em 0.7em;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.18);
-      font-weight: 600;
+      color: var(--gold-strong);
+      font-weight: 700;
+      padding: .6vh .9vw;
+      box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 0 12px rgba(255,255,255,.05);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* ===== Simple fades ===== */
-    .fade-in { animation: fadeIn 350ms ease-out forwards; }
-    .fade-out { animation: fadeOut 250ms ease-in forwards; }
-    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -53%); } to { opacity: 1; transform: translate(-50%, -50%); } }
-    @keyframes fadeOut { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, -47%); } }
+    /* Simple fades for the on-air card */
+    .fade-in { animation: fadeIn .35s ease-out both; }
+    .fade-out { animation: fadeOut .25s ease-in both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%,-53%); } to { opacity: 1; transform: translate(-50%,-50%); } }
+    @keyframes fadeOut { from { opacity: 1; transform: translate(-50%,-50%); } to { opacity: 0; transform: translate(-50%,-47%); } }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <!-- Total -->
     <div class="totalBar">
       <div class="totalLabel">Total Pledged</div>
       <div class="totalValue" id="totalAmount">$0</div>
     </div>
 
+    <!-- Center name for 15s -->
     <div class="onAir" id="onAirCard">
       <div class="pledgeName" id="pledgeName"></div>
       <div class="pledgeAmount" id="pledgeAmount"></div>
     </div>
 
-    <div class="recentPledges" id="recentPledges">
-      <!-- Recent pledge chips appear here -->
-    </div>
+    <!-- Recent columns (5 per side) -->
+    <div class="col left" id="colLeft"></div>
+    <div class="col right" id="colRight"></div>
   </div>
 
   <script>
-    // ===== CONFIG =====
+    /* ===== CONFIG ===== */
     const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyap4VxcOBZ-0PwQuwgEaG3OeFNEly2EwFROUxU_2x8hU00xIqR7l-zMk_8j0zrDvDc9g/exec';
-    const POLL_MS = 5000;       // poll the feed every 5s
-    const ONAIR_MS = 15000;     // each pledge displays ~15s
-    const RECENT_LIMIT = 8;     // how many chips to keep visible
+    const POLL_MS = 5000;      // poll every 5s
+    const ONAIR_MS = 15000;    // on-air duration per pledge
+    const LEFT_MAX = 5;        // left column size
+    const RIGHT_MAX = 5;       // right column size
 
-    // ===== STATE =====
-    let seen = new Set();       // ids of pledges we've counted
-    let queue = [];             // new pledges waiting to be shown
-    let showing = false;        // is a pledge currently on-air?
-    let currentTotal = 0;       // dollar total displayed
-    let initialized = false;    // after first load we only show new items
+    /* ===== STATE ===== */
+    let seen = new Set();      // ids we've processed
+    let queue = [];            // new pledges awaiting on-air
+    let showing = false;
+    let currentTotal = 0;
+    let initialized = false;
+    let recentList = [];       // newest-first; max 10 (5 left + 5 right)
 
-    // ===== DOM =====
+    /* ===== DOM ===== */
     const totalEl = document.getElementById('totalAmount');
     const onAir = document.getElementById('onAirCard');
     const nameEl = document.getElementById('pledgeName');
-    const amtEl  = document.getElementById('pledgeAmount');
-    const recentEl = document.getElementById('recentPledges');
+    const amtEl = document.getElementById('pledgeAmount');
+    const colLeft = document.getElementById('colLeft');
+    const colRight = document.getElementById('colRight');
 
-    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
-    // Robustly read any likely field name from Apps Script JSON
+    /* ===== HELPERS ===== */
     function normalize(data) {
-      // Accept a few possible envelopes
-      let rows = Array.isArray(data) ? data
-               : Array.isArray(data?.data) ? data.data
-               : Array.isArray(data?.pledges) ? data.pledges
-               : [];
-
+      const rows = Array.isArray(data?.pledges) ? data.pledges
+                 : Array.isArray(data?.data) ? data.data
+                 : Array.isArray(data) ? data : [];
       return rows.map((r, i) => {
-        const name = r.Name ?? r.name ?? r.FullName ?? r.fullName ?? r.donor ?? r.Donor ?? 'Anonymous';
-        const amtRaw = r.Amount ?? r.amount ?? r.Pledge ?? r.pledge ?? r.total ?? r.Total ?? r.Sum ?? 0;
-        const tsRaw = r.Timestamp ?? r.timestamp ?? r.Time ?? r.time ?? r.Date ?? r.date ?? null;
-
-        // Parse number from strings like "$1,234" etc.
-        const amount = Number(String(amtRaw).replace(/[^\d.]/g, '')) || 0;
-
-        // derive a stable-ish id
-        const ts = tsRaw ? Date.parse(tsRaw) || tsRaw : '';
-        const id = (r.Id ?? r.id ?? `${name}|${amount}|${ts}|${i}`).toString();
-
-        return { id, name: String(name).trim() || 'Anonymous', amount, ts: ts || Date.now() };
-      }).filter(p => p.amount > 0);
+        const id = String(r.id ?? `${r.name}|${r.amount}|${r.timestamp}|${i}`);
+        const name = String(r.name ?? r.Name ?? 'Anonymous').trim() || 'Anonymous';
+        const amount = Number(String(r.amount ?? r.Amount ?? 0).replace(/[^\d.]/g,'')) || 0;
+        const ts = Date.parse(r.timestamp ?? r.Timestamp ?? Date.now()) || Date.now();
+        return { id, name, amount, ts };
+      }).filter(p => p.amount > 0).sort((a,b)=>a.ts-b.ts);
     }
 
-    function renderTotal(val) { totalEl.textContent = usd.format(Math.round(val)); }
-
-    function animateTotal(from, to, ms = 800) {
-      if (from === to) return;
-      const start = performance.now();
-      function step(t) {
-        const p = Math.min(1, (t - start) / ms);
-        const value = from + (to - from) * p;
-        renderTotal(value);
-        if (p < 1) requestAnimationFrame(step);
-        else renderTotal(to);
-      }
-      requestAnimationFrame(step);
+    function renderTotal(val){ totalEl.textContent = usd0.format(Math.round(val)); }
+    function animateTotal(from, to, ms=800){
+      if(from===to) return;
+      const t0 = performance.now();
+      const tick = (t)=>{
+        const p = Math.min(1,(t - t0)/ms);
+        const v = from + (to-from)*p;
+        renderTotal(v);
+        if(p<1) requestAnimationFrame(tick); else renderTotal(to);
+      };
+      requestAnimationFrame(tick);
     }
 
-    function addRecentChip({name, amount}) {
-      const chip = document.createElement('span');
-      chip.className = 'tag';
-      chip.textContent = `${name} — ${usd.format(amount)}`;
-      recentEl.prepend(chip);
-      // trim
-      while (recentEl.children.length > RECENT_LIMIT) {
-        recentEl.lastElementChild?.remove();
-      }
-    }
-
-    function primeRecent(list) {
-      // Seed recent with last few (without on-airing them)
-      const lastFew = list.slice(-RECENT_LIMIT);
-      lastFew.forEach(p => {
-        addRecentChip(p);
+    /* Layout recent into two columns, newest at top of each column.
+       We keep recentList length <= 10 (LEFT_MAX + RIGHT_MAX). */
+    function renderRecent(){
+      colLeft.innerHTML = '';
+      colRight.innerHTML = '';
+      // Split alternating into left/right for a balanced look
+      const leftItems = [];
+      const rightItems = [];
+      recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=>{
+        (idx % 2 === 0 ? leftItems : rightItems).push(p);
       });
+      leftItems.slice(0, LEFT_MAX).forEach(p=>colLeft.appendChild(makeChip(p)));
+      rightItems.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
     }
 
-    async function poll() {
-      try {
+    function makeChip({name, amount}){
+      const el = document.createElement('div');
+      el.className = 'chip';
+      // No dash between name and amount:
+      el.textContent = `${name} ${usd0.format(amount)}`;
+      return el;
+    }
+
+    function addRecentTop(p){
+      // newest first
+      recentList.unshift(p);
+      // cap at 10
+      if (recentList.length > (LEFT_MAX + RIGHT_MAX)) {
+        recentList.length = (LEFT_MAX + RIGHT_MAX);
+      }
+      renderRecent();
+    }
+
+    /* ===== POLLING ===== */
+    async function poll(){
+      try{
         const res = await fetch(ENDPOINT, { cache: 'no-store' });
         const data = await res.json();
+        const pledges = normalize(data);
 
-        const pledges = normalize(data).sort((a,b) => (a.ts> b.ts ? 1 : -1));
-
-        // On first load: set total to all seen, seed recent, mark all as seen.
-        if (!initialized) {
-          pledges.forEach(p => seen.add(p.id));
-          const baseline = pledges.reduce((s,p) => s + p.amount, 0);
-          currentTotal = baseline;
+        if(!initialized){
+          // baseline totals + seed recent (last 10)
+          pledges.forEach(p=>seen.add(p.id));
+          currentTotal = pledges.reduce((s,p)=>s+p.amount, 0);
           renderTotal(currentTotal);
-          primeRecent(pledges);
+          recentList = pledges.slice(- (LEFT_MAX + RIGHT_MAX)).reverse(); // newest first
+          renderRecent();
           initialized = true;
           return;
         }
 
-        // After init: queue only new ones
-        const newOnes = pledges.filter(p => !seen.has(p.id));
-        newOnes.forEach(p => {
-          seen.add(p.id);
-          queue.push(p);
-        });
-
+        // enqueue only new ones
+        const newOnes = pledges.filter(p=>!seen.has(p.id));
+        newOnes.forEach(p=>{ seen.add(p.id); queue.push(p); });
         kickLoop();
-      } catch (e) {
-        // Silent retry; optionally you could log to console
-        // console.error('Poll error', e);
+      }catch(e){
+        // optional: console.error(e);
       }
     }
 
-    function kickLoop() {
-      if (showing || queue.length === 0) return;
-
+    /* ===== ON-AIR LOOP ===== */
+    function kickLoop(){
+      if(showing || queue.length===0) return;
       const next = queue.shift();
       showing = true;
 
-      // Fill card
       nameEl.textContent = next.name;
-      amtEl.textContent  = usd.format(next.amount);
+      amtEl.textContent = usd0.format(next.amount);
 
-      // Show card with fade
       onAir.classList.remove('fade-out');
       onAir.style.display = 'block';
       onAir.classList.add('fade-in');
 
-      // Animate total up
       const target = currentTotal + next.amount;
       animateTotal(currentTotal, target, 900);
       currentTotal = target;
 
-      // After ONAIR_MS, hide, add to recent, then continue
-      setTimeout(() => {
+      setTimeout(()=>{
         onAir.classList.remove('fade-in');
         onAir.classList.add('fade-out');
-        setTimeout(() => {
+        setTimeout(()=>{
           onAir.style.display = 'none';
-          addRecentChip(next);
+          addRecentTop(next);   // move to columns
           showing = false;
-          // If more queued, immediately continue
-          if (queue.length > 0) kickLoop();
-        }, 260); // match fade-out duration
+          if(queue.length>0) kickLoop();
+        }, 260);
       }, ONAIR_MS);
     }
 
-    // Start
+    /* ===== START ===== */
     renderTotal(0);
-    poll(); // initial
+    poll();
     setInterval(poll, POLL_MS);
   </script>
 </body>
