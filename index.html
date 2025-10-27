@@ -23,14 +23,14 @@
   .totalValue{display:inline-block;padding:1vh 2vw;background:var(--darkBlue);color:var(--gold-strong);font-weight:900;font-size:clamp(34px,5.8vh,84px);border:3px solid var(--gold);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 0 20px rgba(255,255,255,.05)}
 
   /* Latest pledge card RIGHT UNDER the total (tight inner box only) */
-  .onAir{position:absolute;left:50%;top:11vh;transform:translateX(-50%);background:transparent;border:none}
+  .onAir{position:absolute;left:50%;top:17vh;transform:translateX(-50%);background:transparent;border:none}
   .onAirInner{display:inline-block;text-align:center;color:var(--gold-strong);background:var(--darkBlue);border:3px solid var(--gold);border-radius:12px;padding:1vh 1.6vw;box-shadow:0 16px 40px rgba(0,0,0,.45), inset 0 0 12px rgba(255,255,255,.05);display:none}
   .pledgeName{font-size:clamp(20px,3.4vh,42px);font-weight:800}
   .pledgeAmount{font-size:clamp(18px,3.0vh,36px);font-weight:700;margin-top:.4vh}
 
   /* Recent columns (TOP → DOWN, larger font) */
   .col{
-    position:absolute; top:20vh; /* start near the latest card, flow downward */
+    position:absolute; top:22vh; /* slightly below the big name */
     width:min(32vw,520px);
     display:flex; flex-direction:column; gap:1.0vh;
   }
@@ -89,13 +89,13 @@
   const RIGHT_MAX = 5;
 
   /* ===== STATE ===== */
-  let seen = new Set();       // processed IDs
-  let queue = [];             // newly arrived pledges
-  let switching = false;      // animating between on-air items
-  let currentOnAir = null;    // currently displayed pledge (stays until next)
+  let seen = new Set();
+  let queue = [];
+  let switching = false;
+  let currentOnAir = null;
   let currentTotal = 0;
   let initialized = false;
-  let recentList = [];        // newest first (max 10)
+  let recentList = [];
 
   /* ===== DOM ===== */
   const dbg = document.getElementById('dbg');
@@ -121,7 +121,6 @@
     requestAnimationFrame(tick);
   }
 
-  /* ===== Recent (2 columns top-down) ===== */
   function makeChip({name, amount}){
     const el = document.createElement('div');
     el.className = 'chip';
@@ -130,11 +129,10 @@
   }
   function renderRecent(){
     colLeft.innerHTML = ''; colRight.innerHTML = '';
-    // Recent list is newest-first; render top-down
-    const leftItems = [], rightItems = [];
-    recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=> (idx % 2 === 0 ? leftItems : rightItems).push(p));
-    leftItems.slice(0, LEFT_MAX).forEach(p=>colLeft.appendChild(makeChip(p)));
-    rightItems.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
+    const L=[], R=[];
+    recentList.slice(0, LEFT_MAX + RIGHT_MAX).forEach((p, idx)=> (idx % 2 === 0 ? L : R).push(p));
+    L.slice(0, LEFT_MAX).forEach(p=>colLeft.appendChild(makeChip(p)));
+    R.slice(0, RIGHT_MAX).forEach(p=>colRight.appendChild(makeChip(p)));
   }
   function addRecentTop(p){
     recentList.unshift(p);
@@ -142,7 +140,6 @@
     renderRecent();
   }
 
-  /* ===== Safe name builder (in case feed ever splits first/last) ===== */
   function buildName(r){
     const first = r.firstName ?? r.firstname ?? r.first ?? r.FirstName ?? r["First Name"];
     const last  = r.lastName  ?? r.lastname  ?? r.last  ?? r.LastName  ?? r["Last Name"];
@@ -151,7 +148,6 @@
     return String(n || "Anonymous").trim() || "Anonymous";
   }
 
-  /* ===== Normalize feed ===== */
   function normalize(data){
     const rows = Array.isArray(data?.pledges) ? data.pledges
                : Array.isArray(data?.data) ? data.data
@@ -165,9 +161,7 @@
     }).filter(p => p.amount > 0).sort((a,b)=>a.ts-b.ts);
   }
 
-  /* ===== On-air switching ===== */
   function showOnAir(p, addToTotal){
-    // if switching from an existing on-air, fade it out, drop to recent, then fade in the new one
     const doFadeIn = ()=>{
       nameEl.textContent = p.name;
       amtEl.textContent  = usd0.format(p.amount);
@@ -181,7 +175,6 @@
       }
       currentOnAir = p;
       switching = false;
-      // if more arrivals queued during switch, process next
       if (queue.length > 0) switchNext();
     };
 
@@ -193,7 +186,7 @@
         onAirInner.style.display = 'none';
         addRecentTop(currentOnAir);
         doFadeIn();
-      }, 220); // match fade-out
+      }, 220);
     } else {
       doFadeIn();
     }
@@ -202,10 +195,9 @@
   function switchNext(){
     if (switching || queue.length === 0) return;
     const next = queue.shift();
-    showOnAir(next, /*addToTotal=*/true);
+    showOnAir(next, true);
   }
 
-  /* ===== Polling ===== */
   async function poll(){
     try{
       const res = await fetch(`${ENDPOINT_BASE}?t=${Date.now()}`, { cache:'no-store' });
@@ -215,20 +207,17 @@
       setDebug(`feed: ${pledges.length} pledges`);
 
       if(!initialized){
-        // mark all existing as seen, set baseline total, seed columns, and
-        // SHOW the latest pledge on-air (without adding to total again)
         pledges.forEach(p=>seen.add(p.id));
         currentTotal = pledges.reduce((s,p)=>s+p.amount, 0);
         renderTotal(currentTotal);
         recentList = pledges.slice(0, Math.max(0, pledges.length - 1)).slice(- (LEFT_MAX + RIGHT_MAX)).reverse();
         renderRecent();
         const latest = pledges[pledges.length - 1];
-        if (latest) showOnAir(latest, /*addToTotal=*/false);
+        if (latest) showOnAir(latest, false);
         initialized = true;
         return;
       }
 
-      // Only queue truly new IDs
       const newOnes = pledges.filter(p=>!seen.has(p.id));
       newOnes.forEach(p=>{ seen.add(p.id); queue.push(p); });
       switchNext();
@@ -237,7 +226,6 @@
     }
   }
 
-  /* START */
   renderTotal(0);
   poll();
   setInterval(poll, POLL_MS);
