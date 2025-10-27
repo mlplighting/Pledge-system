@@ -1,142 +1,266 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Pledge Form</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pledges Live Overlay</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#f9f9f9; padding:40px; }
-    form { max-width:520px; margin:auto; background:#fff; padding:28px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,.1); }
-    h2 { text-align:center; margin-top:0; }
-    label { display:block; margin:12px 0 6px; font-weight:600; }
-    .row { display:flex; gap:10px; }
-    .row .col { flex:1; }
-    input, button { width:100%; padding:12px; font-size:16px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
-    .hint { font-size:12px; color:#777; margin-top:4px; }
-
-    /* Button states */
-    .btn {
-      border: none;
-      background: #1976d2; /* blue */
+    /* ===== Layout (transparent overlay) ===== */
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: transparent; /* keep overlay see-through */
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       color: #fff;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 16px;
-      transition: opacity .2s ease;
+      overflow: hidden;
     }
-    .btn:disabled {
-      background: #9e9e9e; /* gray when disabled */
-      cursor: not-allowed;
-      opacity: 0.9;
+    .wrap {
+      position: relative;
+      height: 100%;
+      width: 100%;
+      padding: 3vh 4vw;
+      box-sizing: border-box;
     }
 
-    .msg { text-align:center; margin-top:12px; font-size:14px; color:#0a7; display:none; }
-    .err { text-align:center; margin-top:12px; font-size:14px; color:#c00; display:none; }
+    /* ===== Total bar ===== */
+    .totalBar {
+      position: absolute;
+      top: 2vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(92vw, 1400px);
+      text-align: center;
+      padding: 1.2vh 2vw;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .totalLabel { font-size: clamp(14px, 2.2vh, 22px); opacity: 0.85; letter-spacing: 0.06em; }
+    .totalValue { font-weight: 800; font-size: clamp(28px, 5.2vh, 72px); }
+
+    /* ===== On-air card (the 15s spotlight) ===== */
+    .onAir {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(80vw, 1200px);
+      padding: 3vh 3vw;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.3));
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+      color: #fff;
+      text-align: center;
+      display: none;
+    }
+    .pledgeName { font-size: clamp(18px, 3.4vh, 42px); font-weight: 700; }
+    .pledgeAmount { font-size: clamp(18px, 3.2vh, 38px); font-weight: 600; opacity: 0.95; margin-top: 0.6vh; }
+
+    /* ===== Recent pledges row ===== */
+    .recentPledges {
+      position: absolute;
+      bottom: 2vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(92vw, 1400px);
+      padding: 1.2vh 2vw;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      border-radius: 10px;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+      color: #fff;
+      font-size: clamp(14px, 2.5vh, 22px);
+      display: flex;
+      gap: 1.2rem;
+      flex-wrap: nowrap;
+      overflow: hidden;
+      align-items: center;
+    }
+    .recentPledges .tag {
+      white-space: nowrap;
+      padding: 0.4em 0.7em;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      font-weight: 600;
+    }
+
+    /* ===== Simple fades ===== */
+    .fade-in { animation: fadeIn 350ms ease-out forwards; }
+    .fade-out { animation: fadeOut 250ms ease-in forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -53%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+    @keyframes fadeOut { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, -47%); } }
   </style>
 </head>
 <body>
-  <h2>Pledge Form</h2>
-
-  <!-- Posts directly to your Apps Script Web App -->
-  <form id="pledgeForm" method="POST" action="https://script.google.com/macros/s/AKfycbxLodrpbwKU4SZPVZVrJWwDKHYZ4PyaPzFxdeU94ca3qfP8m4QS8nx4pQobPnKfFXxu0A/exec" novalidate>
-    <div class="row">
-      <div class="col">
-        <label for="first_name">First name</label>
-        <input type="text" id="first_name" name="first_name" required autocomplete="given-name" />
-      </div>
-      <div class="col">
-        <label for="last_name">Last name</label>
-        <input type="text" id="last_name" name="last_name" required autocomplete="family-name" />
-      </div>
+  <div class="wrap">
+    <div class="totalBar">
+      <div class="totalLabel">Total Pledged</div>
+      <div class="totalValue" id="totalAmount">$0</div>
     </div>
 
-    <label for="phone">Phone</label>
-    <input type="tel" id="phone" name="phone" inputmode="numeric" maxlength="12" placeholder="123-456-7890" required />
-    <div class="hint">Format: 123-456-7890</div>
+    <div class="onAir" id="onAirCard">
+      <div class="pledgeName" id="pledgeName"></div>
+      <div class="pledgeAmount" id="pledgeAmount"></div>
+    </div>
 
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" required autocomplete="email" />
-
-    <label for="amount_display">Pledge Amount</label>
-    <input type="text" id="amount_display" placeholder="$10,000" required />
-    <!-- hidden numeric field actually submitted to the backend -->
-    <input type="hidden" id="amount" name="amount" />
-
-    <button type="submit" id="submitBtn" class="btn">Submit</button>
-    <div id="ok" class="msg">Thanks! Pledge submitted.</div>
-    <div id="bad" class="err">Please enter a valid amount.</div>
-  </form>
+    <div class="recentPledges" id="recentPledges">
+      <!-- Recent pledge chips appear here -->
+    </div>
+  </div>
 
   <script>
-    // Phone formatter: 123-456-7890
-    const phone = document.getElementById('phone');
-    phone.addEventListener('input', () => {
-      const digits = phone.value.replace(/\D/g, '').slice(0, 10);
-      let out = digits;
-      if (digits.length > 6) out = digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
-      else if (digits.length > 3) out = digits.slice(0,3) + '-' + digits.slice(3);
-      phone.value = out;
-    });
+    // ===== CONFIG =====
+    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyap4VxcOBZ-0PwQuwgEaG3OeFNEly2EwFROUxU_2x8hU00xIqR7l-zMk_8j0zrDvDc9g/exec';
+    const POLL_MS = 5000;       // poll the feed every 5s
+    const ONAIR_MS = 15000;     // each pledge displays ~15s
+    const RECENT_LIMIT = 8;     // how many chips to keep visible
 
-    // Currency formatter (display) + numeric (hidden)
-    const amountDisplay = document.getElementById('amount_display');
-    const amountHidden  = document.getElementById('amount');
+    // ===== STATE =====
+    let seen = new Set();       // ids of pledges we've counted
+    let queue = [];             // new pledges waiting to be shown
+    let showing = false;        // is a pledge currently on-air?
+    let currentTotal = 0;       // dollar total displayed
+    let initialized = false;    // after first load we only show new items
 
-    function formatCurrencyDisplay(digits) {
-      if (!digits) return '';
-      const withCommas = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      return '$' + withCommas;
+    // ===== DOM =====
+    const totalEl = document.getElementById('totalAmount');
+    const onAir = document.getElementById('onAirCard');
+    const nameEl = document.getElementById('pledgeName');
+    const amtEl  = document.getElementById('pledgeAmount');
+    const recentEl = document.getElementById('recentPledges');
+
+    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+    // Robustly read any likely field name from Apps Script JSON
+    function normalize(data) {
+      // Accept a few possible envelopes
+      let rows = Array.isArray(data) ? data
+               : Array.isArray(data?.data) ? data.data
+               : Array.isArray(data?.pledges) ? data.pledges
+               : [];
+
+      return rows.map((r, i) => {
+        const name = r.Name ?? r.name ?? r.FullName ?? r.fullName ?? r.donor ?? r.Donor ?? 'Anonymous';
+        const amtRaw = r.Amount ?? r.amount ?? r.Pledge ?? r.pledge ?? r.total ?? r.Total ?? r.Sum ?? 0;
+        const tsRaw = r.Timestamp ?? r.timestamp ?? r.Time ?? r.time ?? r.Date ?? r.date ?? null;
+
+        // Parse number from strings like "$1,234" etc.
+        const amount = Number(String(amtRaw).replace(/[^\d.]/g, '')) || 0;
+
+        // derive a stable-ish id
+        const ts = tsRaw ? Date.parse(tsRaw) || tsRaw : '';
+        const id = (r.Id ?? r.id ?? `${name}|${amount}|${ts}|${i}`).toString();
+
+        return { id, name: String(name).trim() || 'Anonymous', amount, ts: ts || Date.now() };
+      }).filter(p => p.amount > 0);
     }
 
-    amountDisplay.addEventListener('input', () => {
-      const digits = amountDisplay.value.replace(/\D/g, '');
-      amountDisplay.value = formatCurrencyDisplay(digits);
-      amountHidden.value = digits ? String(parseInt(digits, 10)) : '';
-    });
+    function renderTotal(val) { totalEl.textContent = usd.format(Math.round(val)); }
 
-    // Submit handling with disable-to-prevent-double-click
-    const form   = document.getElementById('pledgeForm');
-    const okMsg  = document.getElementById('ok');
-    const badMsg = document.getElementById('bad');
-    const btn    = document.getElementById('submitBtn');
-
-    form.addEventListener('submit', (e) => {
-      e.preventDefault(); // submit via fetch
-      badMsg.style.display = 'none';
-      okMsg.style.display  = 'none';
-
-      // Ensure hidden numeric amount is set
-      const digits = amountDisplay.value.replace(/\D/g, '');
-      amountHidden.value = digits ? String(parseInt(digits, 10)) : '';
-
-      // Simple validation
-      if (!form.first_name.value.trim() || !form.last_name.value.trim() ||
-          !form.phone.value.trim() || !form.email.value.trim() || !amountHidden.value) {
-        badMsg.textContent = 'Please complete all fields with a valid amount.';
-        badMsg.style.display = 'block';
-        return;
+    function animateTotal(from, to, ms = 800) {
+      if (from === to) return;
+      const start = performance.now();
+      function step(t) {
+        const p = Math.min(1, (t - start) / ms);
+        const value = from + (to - from) * p;
+        renderTotal(value);
+        if (p < 1) requestAnimationFrame(step);
+        else renderTotal(to);
       }
+      requestAnimationFrame(step);
+    }
 
-      // Disable button to prevent multiple submissions
-      btn.disabled = true;
-      const originalText = btn.textContent;
-      btn.textContent = 'Submitting…';
+    function addRecentChip({name, amount}) {
+      const chip = document.createElement('span');
+      chip.className = 'tag';
+      chip.textContent = `${name} — ${usd.format(amount)}`;
+      recentEl.prepend(chip);
+      // trim
+      while (recentEl.children.length > RECENT_LIMIT) {
+        recentEl.lastElementChild?.remove();
+      }
+    }
 
-      fetch(form.action, { method: 'POST', body: new FormData(form) })
-        .then(() => {
-          okMsg.style.display = 'block';
-          form.reset();
-          amountHidden.value = '';
-        })
-        .catch(() => {
-          badMsg.textContent = 'Error submitting. Please try again.';
-          badMsg.style.display = 'block';
-        })
-        .finally(() => {
-          btn.disabled = false;
-          btn.textContent = originalText;
+    function primeRecent(list) {
+      // Seed recent with last few (without on-airing them)
+      const lastFew = list.slice(-RECENT_LIMIT);
+      lastFew.forEach(p => {
+        addRecentChip(p);
+      });
+    }
+
+    async function poll() {
+      try {
+        const res = await fetch(ENDPOINT, { cache: 'no-store' });
+        const data = await res.json();
+
+        const pledges = normalize(data).sort((a,b) => (a.ts> b.ts ? 1 : -1));
+
+        // On first load: set total to all seen, seed recent, mark all as seen.
+        if (!initialized) {
+          pledges.forEach(p => seen.add(p.id));
+          const baseline = pledges.reduce((s,p) => s + p.amount, 0);
+          currentTotal = baseline;
+          renderTotal(currentTotal);
+          primeRecent(pledges);
+          initialized = true;
+          return;
+        }
+
+        // After init: queue only new ones
+        const newOnes = pledges.filter(p => !seen.has(p.id));
+        newOnes.forEach(p => {
+          seen.add(p.id);
+          queue.push(p);
         });
-    });
+
+        kickLoop();
+      } catch (e) {
+        // Silent retry; optionally you could log to console
+        // console.error('Poll error', e);
+      }
+    }
+
+    function kickLoop() {
+      if (showing || queue.length === 0) return;
+
+      const next = queue.shift();
+      showing = true;
+
+      // Fill card
+      nameEl.textContent = next.name;
+      amtEl.textContent  = usd.format(next.amount);
+
+      // Show card with fade
+      onAir.classList.remove('fade-out');
+      onAir.style.display = 'block';
+      onAir.classList.add('fade-in');
+
+      // Animate total up
+      const target = currentTotal + next.amount;
+      animateTotal(currentTotal, target, 900);
+      currentTotal = target;
+
+      // After ONAIR_MS, hide, add to recent, then continue
+      setTimeout(() => {
+        onAir.classList.remove('fade-in');
+        onAir.classList.add('fade-out');
+        setTimeout(() => {
+          onAir.style.display = 'none';
+          addRecentChip(next);
+          showing = false;
+          // If more queued, immediately continue
+          if (queue.length > 0) kickLoop();
+        }, 260); // match fade-out duration
+      }, ONAIR_MS);
+    }
+
+    // Start
+    renderTotal(0);
+    poll(); // initial
+    setInterval(poll, POLL_MS);
   </script>
 </body>
 </html>
