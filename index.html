@@ -19,7 +19,6 @@
 <body>
   <h2>Pledge Form</h2>
 
-  <!-- IMPORTANT: keep your Apps Script Web App URL in the action below -->
   <form id="pledgeForm" method="POST" action="https://script.google.com/macros/s/AKfycbxLodrpbwKU4SZPVZVrJWwDKHYZ4PyaPzFxdeU94ca3qfP8m4QS8nx4pQobPnKfFXxu0A/exec">
     <div class="row">
       <div class="col">
@@ -41,7 +40,6 @@
 
     <label for="amount_display">Pledge Amount</label>
     <input type="text" id="amount_display" placeholder="$10,000" required />
-    <!-- hidden numeric field actually submitted to the backend -->
     <input type="hidden" id="amount" name="amount" />
 
     <button type="submit">Submit</button>
@@ -64,7 +62,6 @@
 
     function formatCurrencyDisplay(digits) {
       if (!digits) return '';
-      // add commas
       const withCommas = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
       return '$' + withCommas;
     }
@@ -75,9 +72,7 @@
       amountHidden.value = digits ? String(parseInt(digits, 10)) : '';
     });
 
-    // Ensure hidden numeric is set before submit
     document.getElementById('pledgeForm').addEventListener('submit', (e) => {
-      // populate numeric if user didn't type after pasting
       const digits = amountDisplay.value.replace(/\D/g, '');
       amountHidden.value = digits ? String(parseInt(digits, 10)) : '';
       if (!amountHidden.value) {
