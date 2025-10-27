@@ -6,7 +6,7 @@
   <title>Pledges Live Overlay</title>
   <style>
     :root{
-      /* Green screen background for Resolume keying */
+      /* Green screen for Resolume keying */
       --chroma: #00b140;
       /* UI colors */
       --darkBlue: #0b1a3a;
@@ -21,7 +21,7 @@
     }
     .wrap { position: relative; width: 100%; height: 100%; }
 
-    /* (tiny) debug line — remove if not needed */
+    /* tiny debug (remove if you don’t want it) */
     .debug {
       position: absolute; top: .6vh; left: .8vw; font-size: 12px; opacity: .65; color: #fff;
       text-shadow: 0 1px 2px rgba(0,0,0,.4); pointer-events: none;
@@ -35,10 +35,10 @@
     .totalLabel {
       color: var(--gold);
       letter-spacing: .06em;
-      font-size: clamp(20px, 3.2vh, 34px); /* bigger + bold */
+      font-size: clamp(20px, 3.2vh, 34px);
       margin-bottom: .8vh;
       text-transform: uppercase;
-      font-weight: 900;
+      font-weight: 900; /* bold */
     }
     .totalValue {
       display: inline-block;
@@ -160,7 +160,7 @@
       requestAnimationFrame(tick);
     }
 
-    /* ===== Recent (2 columns, no row border, newest first) ===== */
+    /* ===== Recent (2 columns, newest first) ===== */
     function makeChip({name, amount}){
       const el = document.createElement('div');
       el.className = 'chip';
